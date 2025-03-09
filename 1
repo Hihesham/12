@@ -1,0 +1,124 @@
+import { useState, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+
+export default function ShiftBooking() {
+  const [userName, setUserName] = useState("");
+  const [selectedSections, setSelectedSections] = useState({});
+  const week1 = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس"];
+  const week2 = ["الأحد", "الاثنين", "الثلاثاء", "الأربعاء", "الخميس"];
+  const sections = ["رجال", "حريم", "استقبال", "عيادة", "علاج نفسي", "علاج إدمان"];
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+
+  useEffect(() => {
+    const storedName = localStorage.getItem("userName");
+    if (storedName) {
+      setUserName(storedName);
+      setIsLoggedIn(true);
+    }
+  }, []);
+
+  const handleLogin = () => {
+    if (userName.trim()) {
+      localStorage.setItem("userName", userName);
+      setIsLoggedIn(true);
+    }
+  };
+
+  const getTotalShifts = useCallback(() => {
+    return Object.values(selectedSections).flatMap(day => Object.values(day)).filter(name => name === userName).length;
+  }, [selectedSections, userName]);
+
+  const toggleSection = (week, day, section) => {
+    if (!isLoggedIn) return;
+    setSelectedSections((prev) => {
+      const updatedSections = { ...prev };
+      const totalShifts = getTotalShifts();
+      const isSelected = updatedSections[`${week}-${day}`]?.[section] === userName;
+      
+      if (isSelected) {
+        delete updatedSections[`${week}-${day}`][section];
+      } else {
+        if (totalShifts >= 3) return prev; // لا يمكن اختيار أكثر من 3 شفتات في المجموع
+        if (!updatedSections[`${week}-${day}`]) updatedSections[`${week}-${day}`] = {};
+        if (Object.values(updatedSections[`${week}-${day}`]).includes(userName)) return prev; // لا يمكن اختيار أكثر من قسم في نفس اليوم
+        updatedSections[`${week}-${day}`][section] = userName;
+      }
+      return updatedSections;
+    });
+  };
+
+  const handleSave = () => {
+    console.log("تم الحفظ", selectedSections);
+    alert("تم حفظ اختياراتك بنجاح!");
+  };
+
+  const handleClearSelections = () => {
+    setSelectedSections({});
+  };
+
+  const isSaveDisabled = getTotalShifts() !== 3;
+
+  return (
+    <div className="p-6 bg-gradient-to-r from-gray-800 to-gray-900 min-h-screen text-white">
+      {!isLoggedIn ? (
+        <div className="flex flex-col gap-4 items-center mt-10">
+          <Input
+            className="p-2 border border-gray-600 rounded-lg w-64 focus:ring-2 focus:ring-blue-400 bg-gray-700 text-white shadow-md"
+            placeholder="أدخل اسمك"
+            value={userName}
+            onChange={(e) => setUserName(e.target.value)}
+          />
+          <Button className="bg-blue-500 text-white px-4 py-2 rounded-lg shadow-lg hover:bg-blue-600 transition-all" onClick={handleLogin}>تسجيل الدخول</Button>
+        </div>
+      ) : (
+        <div className="max-w-5xl mx-auto">
+          <h2 className="text-3xl font-semibold text-center my-6 border-b pb-4 text-blue-400">مرحبًا، {userName}!</h2>
+          {getTotalShifts() !== 3 && <p className="text-red-400 text-center">يجب اختيار 3 شفتات بالضبط</p>}
+          <div className="grid grid-cols-1 gap-12">
+            {[week1, week2].map((week, index) => (
+              <div key={index}>
+                <h3 className="text-xl font-semibold text-center mb-4 text-blue-300">{index === 0 ? "الأسبوع الأول" : "الأسبوع الثاني"}</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {week.map((day) => (
+                    <Card key={day} className="p-4 bg-gray-700 shadow-xl rounded-lg border border-gray-600 hover:shadow-2xl transition-all">
+                      <CardContent className="text-center font-semibold text-lg text-blue-300 border-b pb-2">{day}</CardContent>
+                      <div className="flex flex-col gap-3 mt-3">
+                        {sections.map((section) => (
+                          <Button
+                            key={section}
+                            onClick={() => toggleSection(index, day, section)}
+                            className={`w-full py-2 rounded-lg border font-medium transition-all ${
+                              selectedSections[`${index}-${day}`]?.[section] ? "bg-blue-500 text-white shadow-md border-blue-700" : "bg-gray-600 text-white border-gray-500 hover:bg-gray-500"
+                            }`}
+                            disabled={getTotalShifts() >= 3 && !selectedSections[`${index}-${day}`]?.[section]}
+                          >
+                            {section} {selectedSections[`${index}-${day}`]?.[section] ? `- ${selectedSections[`${index}-${day}`][section]}` : ""}
+                          </Button>
+                        ))}
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="flex justify-center mt-6">
+            <Button 
+              className="bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg hover:bg-red-600 transition-all mr-4" 
+              onClick={handleClearSelections}>
+              إلغاء الاختيارات
+            </Button>
+            <Button 
+              className={`bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg hover:bg-green-600 transition-all ${isSaveDisabled ? 'opacity-50 cursor-not-allowed' : ''}`} 
+              onClick={handleSave}
+              disabled={isSaveDisabled}>
+              حفظ
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
